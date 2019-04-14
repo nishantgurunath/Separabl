@@ -8,10 +8,7 @@ from operator import itemgetter
 import torch.nn.utils.rnn as rnn
 import librosa
 import os
-#from rpca import *
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'spectral_models'))
-from repet1 import *
+from rpca import *
 
 def loss_fn(recon_x, x, mu_s, logvar_s, mu_r, logvar_r, mu_r1, logvar_r1, mu_r2, logvar_r2, criterion_mse):
     MSE = criterion_mse(recon_x, x)
@@ -102,7 +99,7 @@ def librosa_eval(file_name,model):
         magx,P = librosa.magphase(x)
         y = librosa.istft(x)
         librosa.output.write_wav('soundo.wav',y,fs)
-        print (x.shape)
+
         out,mu_s,log_var_s,mu_r,log_var_r,mu_r1,log_var_r1,mu_r2,log_var_r2,mask = model([torch.cuda.FloatTensor(magx.T)],eps=0,eta=0,test=0)
         S,N,E = out.shape
         out = (out.view(-1,E)*mask.contiguous().view(-1,1))
@@ -112,7 +109,6 @@ def librosa_eval(file_name,model):
         x,M = speech(x,0.3,0.5)
         y = librosa.istft(x)
 
-        print (y.dtype)
         librosa.output.write_wav('soundg.wav',y,fs)
 
 
@@ -229,18 +225,5 @@ class model_run:
 
 
 M = model_run
-#test_model = multilingual_speech_model()
-#test_model = test_model.cuda()
-#alpha = torch.cuda.FloatTensor([[[0.25,0.25,0.25,0.25]]])
-#logalpha = torch.log(alpha)
-#a = torch.cuda.FloatTensor([[[0.05,0.85,0.05,0.05]]])
-#loga = torch.log(a)
-#lmda = 1e-1
-#Y = test_model.Multinomial_Embed(logalpha,lmda)
-#print (torch.exp(Y))
-#prob = logProb(Y,logalpha,lmda)
-#print (torch.exp(prob))
-#KL = torch.sum(torch.exp(logProb(Y,logalpha,lmda))*(logProb(Y,logalpha,lmda) - logProb(Y,logalpha,lmda)))
-#print (KL)
-#M.train(M,50)
-M.eval(M)
+M.train(M,50)
+#M.eval(M)
