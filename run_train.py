@@ -12,14 +12,6 @@ from model import multilingual_speech_model
 ## Parameters
 # Data - 3 sec, 321x300, sr=16000, 100 frames/sec 
 
-## Arguments - No. of latent variables or GMM likelihood, Train Data Path
-
-## Model
-
-## Train
-
-## Save Best Model
-
 
 def kl_anneal_function(step, k=0.0050, x0=4000, anneal_function='logistic'):
     if anneal_function == 'logistic':
@@ -132,14 +124,6 @@ class model_run:
                 updates += 1
 
                 out = out.view(-1,E)*mask.contiguous().view(-1,1)
-                #mu_s = mu_s.view(-1,mu_s.shape[2])*mask.contiguous().view(-1,1)
-                #log_var_s = log_var_s.view(-1,log_var_s.shape[2])*mask.contiguous().view(-1,1)
-                #mu_r = mu_r.view(-1,mu_r.shape[2])*mask.contiguous().view(-1,1)
-                #log_var_r = log_var_r.view(-1,log_var_r.shape[2])*mask.contiguous().view(-1,1)
-                #mu_r1 = mu_r1.view(-1,mu_r1.shape[2])*mask.contiguous().view(-1,1)
-                #log_var_r1 = log_var_r1.view(-1,log_var_r1.shape[2])*mask.contiguous().view(-1,1)
-                #mu_r2 = mu_r2.view(-1,mu_r2.shape[2])*mask.contiguous().view(-1,1)
-                #log_var_r2 = log_var_r2.view(-1,log_var_r2.shape[2])*mask.contiguous().view(-1,1)
 
                 K,S,N,E1 = mu.shape
                 mu = mu.permute(1,2,0,3).contiguous().view(-1,K,E1)*mask.contiguous().view(-1,1,1)
@@ -162,10 +146,6 @@ class model_run:
                     print("Epoch: ", e, "Iter: ", i, "Loss: ", (epoch_loss/(samples)), "KL", epoch_KL/samples,  "MSE ", epoch_MSE/samples)
 
            
-            #if (e+1) % 1 == 0:
-            #    torch.save(model.state_dict(), "models_dc/model" + str(e) + ".pt")
-            #    print("Epoch: ", e, "Iter: ", i, "Loss: ", (epoch_loss/(samples)))
-
             if epoch_KL/samples < 60 and epoch_MSE/samples < 250:
                 torch.save(model.state_dict(), "models/model" + str(e) + ".pt")
                 print("Epoch: ", e,  "Loss: ", (epoch_loss/(samples)), "KL", epoch_KL/samples,  "MSE ", epoch_MSE/samples)
@@ -175,10 +155,6 @@ class model_run:
     def loss_fn(self,recon_x, x, mu, log_var, criterion_mse):
         MSE = criterion_mse(recon_x, x)
         MSE = torch.sum(MSE)
-        # see Appendix B from VAE paper:
-        # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
-        # https://arxiv.org/abs/1312.6114
-        # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
 
         K,N,E = mu.shape
         mu = mu.contiguous().view(K,-1)
