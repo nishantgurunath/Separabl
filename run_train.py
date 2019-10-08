@@ -7,6 +7,7 @@ import torch.nn.utils.rnn as rnn
 from sklearn.mixture import GaussianMixture
 import argparse
 from model import multilingual_speech_model
+import os
 
 
 ## Parameters
@@ -187,6 +188,9 @@ if __name__ == "__main__":
             break
         K += 1
 
+    directory = "./models"
+    if not os.path.exists(directory):
+        os.makedirs(directory)
 
     ## Train
     run = model_run()
