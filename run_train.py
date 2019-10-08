@@ -173,19 +173,19 @@ if __name__ == "__main__":
     args = vars(ap.parse_args())
 
     ## Load Data
-    #train_data = np.load(args['path'])
-    train_data = np.array([np.zeros((300,321))]*32)
-    num_epochs = 2
+    train_data = np.load(args['path'])
+    #train_data = np.array([np.zeros((300,321))]*32)
+    num_epochs = 50
 
     ## Find No. of latent nodes
-    K = 3
-    #while(1):
-    #    gmm = GaussianMixture(n_components=K)
-    #    gmm.fit(train_data)
-    #    likelihood = gmm.lower_bound_
-    #    if(likelihood > 1070):
-    #        break
-    #    K += 1
+    K = 2
+    while(1):
+        gmm = GaussianMixture(n_components=K)
+        gmm.fit(train_data)
+        likelihood = gmm.lower_bound_
+        if(likelihood > 1070):
+            break
+        K += 1
 
 
     ## Train
