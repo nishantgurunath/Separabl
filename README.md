@@ -11,6 +11,8 @@ In order to build language technologies for majority of the languages, it is imp
 
 
 ## Usage:
+### Train:
+
 ```
 python3 run_train -p <path_to_train_data>
 ```
@@ -24,6 +26,13 @@ python3 run_train -p <path_to_train_data>
   - Average Sample Size for Satisfactory Results = 2hrs (2500 Samples)
   - Format - .npy
  
+### Eval:
+```
+python3 run_eval -p <path_to_wav>
+```
+- Eval Data:
+  - Wav File
+
 ## Requirements:
 ```
 pip3 install -r requirements.txt
