@@ -14,7 +14,7 @@ import os
 # Data - 3 sec, 321x300, sr=16000, 100 frames/sec 
 
 
-def kl_anneal_function(step, k=0.0050, x0=4000, anneal_function='logistic'):
+def kl_anneal_function(step, k=0.0050, x0=3000, anneal_function='logistic'):
     if anneal_function == 'logistic':
         return float(1/(1+np.exp(-k*(step-x0))))
     elif anneal_function == 'linear':
@@ -83,13 +83,16 @@ class SpeechModelDataLoader(DataLoader):
 
 class model_run:
 
-    def train(self, num_epochs, num_latent, data):
+    def train(self, num_epochs, num_latent, train_data):
 
         ## Parameters ##
         batch_size = 16
         lr = 0.001
-        print (len(data))
-
+        print (len(train_data))
+        k = 40*batch_size/(len(train_data)*num_epochs)
+        x0 = len(train_data)*num_epochs//(batch_size*2)
+        k = 0.0050
+        x0 = 4000
         ## Model ##
         model = multilingual_speech_model(num_latent)
         model = model.cuda() if torch.cuda.is_available() else model
@@ -98,7 +101,7 @@ class model_run:
 
 
         ##Data Loader   ## 
-        loader = SpeechModelDataLoader(abs(data), shuffle=True, batch_size=batch_size)
+        loader = SpeechModelDataLoader(abs(train_data), shuffle=True, batch_size=batch_size)
 
 
         # Criterion - Negative Log Likelihood + KL Divergence Z
@@ -125,20 +128,27 @@ class model_run:
                 updates += 1
 
                 out = out.view(-1,E)*mask.contiguous().view(-1,1)
+                #mu = mu.view(-1,mu.shape[2])*mask.contiguous().view(-1,1)
+                #log_var = log_var.view(-1,log_var.shape[2])*mask.contiguous().view(-1,1)
 
                 K,S,N,E1 = mu.shape
-                mu = mu.permute(1,2,0,3).contiguous().view(-1,K,E1)*mask.contiguous().view(-1,1,1)
-                mu = mu.permute(1,0,2)
-                log_var = log_var.permute(1,2,0,3).contiguous().view(-1,K,E1)*mask.contiguous().view(-1,1,1)
-                log_var = log_var.permute(1,0,2)
+                mu = mu.permute(0,3,1,2).contiguous().view(K,E1,-1)*mask.contiguous().view(1,1,-1)
+                mu = mu.permute(0,2,1)
+                log_var = log_var.permute(0,3,1,2).contiguous().view(K,E1,-1)*mask.contiguous().view(1,1,-1)
+                log_var = log_var.permute(0,2,1)
+
+                
 
                 KL,MSE = self.loss_fn(out,padded_data.view(-1,E),mu,log_var,criterion_mse)
                 MSE = MSE/(S) 
-                weight =  kl_anneal_function(updates,k=40*batch_size/(len(data)*num_epochs),x0=len(data)*num_epochs//(batch_size*2))
+                #weight =  kl_anneal_function(updates,k,x0)
+                weight =  kl_anneal_function(updates)
                 NLL =  MSE + (torch.sum(KL))*weight
+                #NLL =  MSE + KL*weight
                 NLL.backward()
                 epoch_loss += NLL.item()
                 epoch_KL += torch.sum(KL).item()/K
+                #epoch_KL += KL.item()
                 epoch_MSE += MSE.item()
                 #torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
@@ -147,21 +157,21 @@ class model_run:
                     print("Epoch: ", e, "Iter: ", i, "Loss: ", (epoch_loss/(samples)), "KL", epoch_KL/samples,  "MSE ", epoch_MSE/samples)
 
            
-            if epoch_KL/samples < 60 and epoch_MSE/samples < 250:
+            if epoch_KL/(10*samples) < 60 and epoch_MSE/samples < 250:
                 torch.save(model.state_dict(), "models/model" + str(e) + ".pt")
                 print("Epoch: ", e,  "Loss: ", (epoch_loss/(samples)), "KL", epoch_KL/samples,  "MSE ", epoch_MSE/samples)
-                #break 
+                break 
 
 
     def loss_fn(self,recon_x, x, mu, log_var, criterion_mse):
         MSE = criterion_mse(recon_x, x)
         MSE = torch.sum(MSE)
 
-        K,N,E = mu.shape
+        #K,N,E = mu.shape
         mu = mu.contiguous().view(K,-1)
         log_var = log_var.contiguous().view(K,-1)
         KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp(), dim = 1)
-        
+        #KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
         return KLD, MSE
 
 
@@ -179,15 +189,19 @@ if __name__ == "__main__":
     num_epochs = 50
 
     ## Find No. of latent nodes
+    X = []
+    for i in range(len(train_data)):
+        X.append(np.mean(train_data[i],axis=0))
+    X = np.array(X)
     K = 2
     while(1):
         gmm = GaussianMixture(n_components=K)
-        gmm.fit(train_data)
+        gmm.fit(np.absolute(X))
         likelihood = gmm.lower_bound_
         if(likelihood > 1070):
             break
         K += 1
-
+    print ("No. of Latent Nodes: ",K-1)
     directory = "./models"
     if not os.path.exists(directory):
         os.makedirs(directory)

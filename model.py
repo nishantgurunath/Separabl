@@ -20,8 +20,17 @@ class multilingual_speech_model(nn.Module):
         
         
         self.encoder = nn.LSTM(self.input_size,self.ehidden_size, num_layers = 2, bidirectional=True) # S x N x 512*2
-        self.fc_gaussian = [(nn.Linear(self.ehidden_size*2, int(self.dinput_size/(num_latent+1))),nn.Linear(self.ehidden_size*2, int(self.dinput_size/(num_latent+1))))]*num_latent
-    
+        if(torch.cuda.is_available()):
+            self.mu = nn.Module()
+            self.sigma = nn.Module()
+            for i in range(num_latent):
+                self.mu.add_module(str(i),nn.Linear(self.ehidden_size*2, int(self.dinput_size/(num_latent+1))).cuda())
+            for i in range(num_latent):
+                self.sigma.add_module(str(i),nn.Linear(self.ehidden_size*2, int(self.dinput_size/(num_latent+1))).cuda())
+        else:
+            self.fc_gaussian = [(nn.Linear(self.ehidden_size*2, int(self.dinput_size/(num_latent+1))), \
+                                 nn.Linear(self.ehidden_size*2, int(self.dinput_size/(num_latent+1))))]*num_latent
+
         self.decoder = nn.LSTM(self.dinput_size, self.dhidden_size, bidirectional = True) # S x N x 512*2
         if(torch.cuda.is_available()):
             self.c = nn.Parameter(torch.zeros(2,self.dhidden_size).type(torch.cuda.FloatTensor))
@@ -42,7 +51,6 @@ class multilingual_speech_model(nn.Module):
         x,(h,c) = self.encoder(x)
         x,l = rnn.pad_packed_sequence(x) # S x N x 512*2
         S,N,E = x.shape  
-
         # Mask
         if torch.cuda.is_available():
             mask = torch.zeros((N,S)).type(torch.cuda.FloatTensor) # N x S
@@ -54,12 +62,24 @@ class multilingual_speech_model(nn.Module):
         mask = torch.transpose(mask,0,1) # S x N
 
 
-        z = torch.zeros((self.num_latent,S,N,self.dinput_size//(self.num_latent+1)))
-        mu = torch.zeros((self.num_latent,S,N,self.dinput_size//(self.num_latent+1)))
-        log_var = torch.zeros((self.num_latent,S,N,self.dinput_size//(self.num_latent+1)))
-        for i,fc in enumerate(self.fc_gaussian):
-            mu_temp = fc[0](x)
-            log_var_temp = fc[1](x)
+        if torch.cuda.is_available():
+            z = torch.zeros((self.num_latent,S,N,self.dinput_size//(self.num_latent+1))).type(torch.cuda.FloatTensor)
+            mu = torch.zeros((self.num_latent,S,N,self.dinput_size//(self.num_latent+1))).type(torch.cuda.FloatTensor)
+            log_var = torch.zeros((self.num_latent,S,N,self.dinput_size//(self.num_latent+1))).type(torch.cuda.FloatTensor)
+        else:
+            z = torch.zeros((self.num_latent,S,N,self.dinput_size//(self.num_latent+1)))
+            mu = torch.zeros((self.num_latent,S,N,self.dinput_size//(self.num_latent+1)))
+            log_var = torch.zeros((self.num_latent,S,N,self.dinput_size//(self.num_latent+1)))
+
+        for i,fc in enumerate(self.mu._modules.values()):
+            mu[i] = fc(x)
+            
+        for i,fc in enumerate(self.sigma._modules.values()):
+            log_var[i] = fc(x)
+
+        for i in range(self.num_latent):
+            mu_temp = mu[i]           
+            log_var_temp = log_var[i]
             std_temp = torch.exp(0.5*log_var_temp)
             if torch.cuda.is_available():
                 z_temp = (mu_temp+eps) + eta*std_temp*(torch.randn(std_temp.shape).type(torch.cuda.FloatTensor))
@@ -67,8 +87,12 @@ class multilingual_speech_model(nn.Module):
                 z_temp = (mu_temp+eps) + eta*std_temp*(torch.randn(std_temp.shape).type(torch.FloatTensor))
 
             z[i] = z_temp 
-            mu[i] = mu_temp 
-            log_var[i] = log_var_temp
+        #print (self.mu._modules)
+        #print (self.mu._modules['0'])
+        #mu = self.mu._modules['0'](x) # S x N x 64
+        #log_var = self.sigma._modules['0'](x) # S x N x 64
+        #std = torch.exp(0.5*log_var)
+        #z = (mu+eps) + eta*std*(torch.randn(std.shape).type(torch.cuda.FloatTensor)) 
 
 
         return z,mu,log_var,mask
@@ -76,11 +100,13 @@ class multilingual_speech_model(nn.Module):
 
     def decoder_block(self,z):
         K,S,N,E = z.shape
+        #S,N,E = z.shape
         c = self.h.view(-1).unsqueeze(0) # 1 x 512*2
         c = c.expand(N,-1) # N x 512*2
         c = self.context(c) # N x 64
         inp = z.permute(1,2,0,3)[0].contiguous().view(N,K*E)
         inp = torch.cat((inp,c),dim=1).unsqueeze(0)
+        #inp = torch.cat((z[0],c),dim=1).unsqueeze(0)
         h_0 = self.h.unsqueeze(1) # 2 x 1 x 512
         h_0 = h_0.expand(-1,N,-1).contiguous() # 2 x N x 512
         c_0 = self.c.unsqueeze(1) # 2 x 1 x 512
@@ -95,6 +121,7 @@ class multilingual_speech_model(nn.Module):
             c = self.context(c) # N x 64
             inp = z.permute(1,2,0,3)[i].contiguous().view(N,K*E)
             inp = torch.cat((inp,c),dim=1).unsqueeze(0)
+            #inp = torch.cat((z[i],c),dim=1).unsqueeze(0)
             x_n,(h_n,c_n) = self.decoder(inp,(h_n,c_n))
             out = torch.cat((out,x_n), dim=0)
 
