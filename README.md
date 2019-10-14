@@ -11,8 +11,13 @@ In order to build language technologies for majority of the languages, it is imp
 
 
 ## Usage:
-### Train:
 
+## Requirements:
+```
+pip3 install -r requirements.txt
+```
+
+### Train:
 ```
 python3 run_train -p <path_to_train_data>
 ```
@@ -34,7 +39,4 @@ python3 run_eval -p <path_to_wav> -m <path_to_model>
   - Wav File (input.wav)
   - Cleaned wav file saved to ./output/input_cleaned.wav
 
-## Requirements:
-```
-pip3 install -r requirements.txt
-```
+
