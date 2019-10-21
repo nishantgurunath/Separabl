@@ -24,10 +24,9 @@ python3 run_train -p <path_to_train_data>
 - Train Data: 
   - Magnitude Spectrogram
   - Audio Sample Rate = 16000 Samples/sec
-  - Sample duration = 3 sec
+  - Sample duration can vary (Model samples 3 sec clip randomly)
   - n_FFT = 640, Hop Length = 160
   - Frames/sec = Sample Rate/ Hop_Length = 100 frames/sec
-  - Sample Size = 300 x 321
   - Average Sample Size for Satisfactory Results = 2hrs (2500 Samples)
   - Format - .npy
  
