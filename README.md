@@ -29,6 +29,7 @@ python3 run_train -p <path_to_train_data> -n(optional) <num_latent_nodes>
   - Frames/sec = Sample Rate/ Hop_Length = 100 frames/sec
   - Average Sample Size for Satisfactory Results = 2hrs (2500 Samples)
   - Format - .npy
+> Note: Training routine saves multiple potential models for source separation. Try them out.  
  
 ### Eval:
 ```
