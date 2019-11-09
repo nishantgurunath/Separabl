@@ -91,12 +91,10 @@ class model_run:
         print (len(train_data))
         k = 40*batch_size/(len(train_data)*num_epochs)
         x0 = len(train_data)*num_epochs//(batch_size*2)
-        k = 0.0050
-        x0 = 4000
         ## Model ##
         model = multilingual_speech_model(num_latent)
         model = model.cuda() if torch.cuda.is_available() else model
-        #model_state = torch.load('models_dc/model49.pt')
+        #model_state = torch.load('models/model8.pt')
         #model.load_state_dict(model_state)    
 
 
@@ -128,8 +126,6 @@ class model_run:
                 updates += 1
 
                 out = out.view(-1,E)*mask.contiguous().view(-1,1)
-                #mu = mu.view(-1,mu.shape[2])*mask.contiguous().view(-1,1)
-                #log_var = log_var.view(-1,log_var.shape[2])*mask.contiguous().view(-1,1)
 
                 K,S,N,E1 = mu.shape
                 mu = mu.permute(0,3,1,2).contiguous().view(K,E1,-1)*mask.contiguous().view(1,1,-1)
@@ -141,14 +137,13 @@ class model_run:
 
                 KL,MSE = self.loss_fn(out,padded_data.view(-1,E),mu,log_var,criterion_mse)
                 MSE = MSE/(S) 
-                #weight =  kl_anneal_function(updates,k,x0)
-                weight =  kl_anneal_function(updates)
+                weight =  kl_anneal_function(updates,k,x0)
+                #weight =  kl_anneal_function(updates)
                 NLL =  MSE + (torch.sum(KL))*weight
-                #NLL =  MSE + KL*weight
+                #NLL =  MSE
                 NLL.backward()
                 epoch_loss += NLL.item()
                 epoch_KL += torch.sum(KL).item()/K
-                #epoch_KL += KL.item()
                 epoch_MSE += MSE.item()
                 #torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 optimizer.step()
@@ -157,21 +152,20 @@ class model_run:
                     print("Epoch: ", e, "Iter: ", i, "Loss: ", (epoch_loss/(samples)), "KL", epoch_KL/samples,  "MSE ", epoch_MSE/samples)
 
            
-            if epoch_KL/(10*samples) < 60 and epoch_MSE/samples < 250:
+            if epoch_KL/(10*samples) < 1000 and epoch_MSE/samples < 250:
                 torch.save(model.state_dict(), "models/model" + str(e) + ".pt")
                 print("Epoch: ", e,  "Loss: ", (epoch_loss/(samples)), "KL", epoch_KL/samples,  "MSE ", epoch_MSE/samples)
-                break 
+            #    break 
 
 
     def loss_fn(self,recon_x, x, mu, log_var, criterion_mse):
         MSE = criterion_mse(recon_x, x)
         MSE = torch.sum(MSE)
 
-        #K,N,E = mu.shape
+        K,N,E = mu.shape
         mu = mu.contiguous().view(K,-1)
         log_var = log_var.contiguous().view(K,-1)
         KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp(), dim = 1)
-        #KLD = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
         return KLD, MSE
 
 
@@ -181,6 +175,7 @@ if __name__ == "__main__":
     ## Parse Arguments
     ap = argparse.ArgumentParser()
     ap.add_argument("-p", "--path", required=True, help="Path to Train Data")
+    ap.add_argument("-n", "--num_latent", required=False, help="Path to Train Data")
     args = vars(ap.parse_args())
 
     ## Load Data
@@ -189,19 +184,22 @@ if __name__ == "__main__":
     num_epochs = 50
 
     ## Find No. of latent nodes
-    X = []
-    for i in range(len(train_data)):
-        X.append(np.mean(train_data[i],axis=0))
-    X = np.array(X)
-    K = 2
-    while(1):
-        gmm = GaussianMixture(n_components=K)
-        gmm.fit(np.absolute(X))
-        likelihood = gmm.lower_bound_
-        if(likelihood > 1070):
-            break
-        K += 1
-    print ("No. of Latent Nodes: ",K-1)
+    if(args['num_latent']):
+        K = int(args['num_latent']) + 1
+    else:
+        X = []
+        for i in range(len(train_data)):
+            X.append(np.mean(train_data[i],axis=0))
+        X = np.array(X)
+        K = 2
+        while(1):
+            gmm = GaussianMixture(n_components=K,covariance_type='diag')
+            gmm.fit(np.absolute(X))
+            likelihood = gmm.lower_bound_
+            if(likelihood > 1080):
+                break
+            K += 1
+        print ("No. of Latent Nodes: ",K-1, ", Likelihood:  ", likelihood)
     directory = "./models"
     if not os.path.exists(directory):
         os.makedirs(directory)
