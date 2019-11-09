@@ -19,7 +19,7 @@ pip3 install -r requirements.txt
 
 ### Train:
 ```
-python3 run_train -p <path_to_train_data> -l(optional) <num_latent_nodes>
+python3 run_train -p <path_to_train_data> -n(optional) <num_latent_nodes>
 ```
 - Train Data: 
   - Magnitude Spectrogram
