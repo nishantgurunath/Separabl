@@ -43,4 +43,4 @@ python3 run_eval -p <path_to_wav> -m <path_to_model>
 
 
 ## Note: 
-- Need more work on Kaldi ASR
+- Needs more work on Kaldi ASR
