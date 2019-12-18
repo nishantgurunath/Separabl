@@ -42,3 +42,5 @@ python3 run_eval -p <path_to_wav> -m <path_to_model>
   - Cleaned wav file saved to ./output/input_cleaned.wav
 
 
+## Note: 
+- Need more work on Kaldi ASR
