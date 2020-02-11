@@ -10,6 +10,7 @@ from model import multilingual_speech_model
 import os
 
 
+
 ## Parameters
 # Data - 3 sec, 321x300, sr=16000, 100 frames/sec 
 
